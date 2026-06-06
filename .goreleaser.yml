@@ -8,6 +8,8 @@ before:
 
 builds:
   - id: connector
+    binary: dataseai-connector
+    main: ./cmd/connector
     env:
       - CGO_ENABLED=0
     goos:
