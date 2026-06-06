@@ -9,15 +9,14 @@ import (
 	"log"
 	"net"
 	"os"
-	"os/signal"
 	"runtime"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/cin-yi-wei/dataseai-connector/pkg/protocol"
 	"github.com/coder/websocket"
 	"github.com/coder/websocket/wsjson"
+	"github.com/kardianos/service"
 )
 
 var (
@@ -26,56 +25,202 @@ var (
 	date    = "unknown"
 )
 
+const usage = `dataseai-connector — LAN agent for the dataseai cloud.
+
+USAGE
+  dataseai-connector [SUBCOMMAND] [FLAGS]
+
+SUBCOMMANDS
+  install     write config file and register as a system service
+  uninstall   stop, unregister, leave config file in place
+  start       start the installed service
+  stop        stop the installed service
+  restart     stop + start
+  status      print service status
+  run         run in the foreground (for development)
+  version     print version and exit
+
+If no subcommand is given, the binary runs in service mode (which is what
+systemd / launchd / SCM invoke on boot).
+
+FLAGS (for install / run)
+  --token=ag_xxxx     agent token  (env: DATASEAI_TOKEN)
+  --server=wss://…    broker URL   (default wss://dataseai.app/agent)
+  --executor=mysql    mysql | mock (default mysql)
+  --config=/path      override config path (default platform-specific)
+
+CONFIG FILE
+  Linux:   /etc/dataseai-connector/config.yaml
+  macOS:   /Library/Application Support/dataseai-connector/config.yaml
+  Windows: %ProgramData%\dataseai-connector\config.yaml
+`
+
 func main() {
-	token := flag.String("token", "", "agent token (env: DATASEAI_TOKEN)")
-	server := flag.String("server", "ws://localhost:8080/agent", "broker URL")
-	execName := flag.String("executor", "mysql", "query executor: mysql | mock")
-	flag.Parse()
+	fs := flag.NewFlagSet("dataseai-connector", flag.ExitOnError)
+	token := fs.String("token", "", "agent token")
+	server := fs.String("server", "wss://dataseai.app/agent", "broker URL")
+	execName := fs.String("executor", "mysql", "query executor")
+	cfgPath := fs.String("config", defaultConfigPath(), "config file path")
+	fs.Usage = func() { fmt.Fprint(os.Stderr, usage) }
 
-	if *token == "" {
-		*token = os.Getenv("DATASEAI_TOKEN")
+	// First positional arg (if any) is the subcommand.
+	var subcmd string
+	if len(os.Args) >= 2 && len(os.Args[1]) > 0 && os.Args[1][0] != '-' {
+		subcmd = os.Args[1]
+		_ = fs.Parse(os.Args[2:])
+	} else {
+		_ = fs.Parse(os.Args[1:])
 	}
-	if *token == "" {
-		log.Fatal("error: --token required (or DATASEAI_TOKEN env)")
-	}
 
-	log.Printf("dataseai-connector %s (commit=%s, date=%s)", version, commit, date)
-	log.Printf("system: %s/%s, go=%s", runtime.GOOS, runtime.GOARCH, runtime.Version())
-	log.Printf("server: %s", *server)
-	log.Printf("executor: %s", *execName)
-
-	var executor Executor
-	switch *execName {
-	case "mock":
-		executor = MockExecutor{}
-	case "mysql":
-		executor = MySQLExecutor{}
+	switch subcmd {
+	case "version":
+		fmt.Printf("dataseai-connector %s (commit=%s, date=%s)\n", version, commit, date)
+		return
+	case "install":
+		runInstall(*cfgPath, *token, *server, *execName)
+		return
+	case "uninstall", "start", "stop", "restart":
+		runControl(subcmd)
+		return
+	case "status":
+		runStatus()
+		return
+	case "run":
+		runForeground(*cfgPath, *token, *server, *execName)
+		return
+	case "":
+		// service mode (default when invoked by systemd / launchd / SCM)
+		runService(*cfgPath)
 	default:
-		log.Fatalf("unknown executor %q; valid: mysql | mock", *execName)
+		fmt.Fprintf(os.Stderr, "unknown subcommand %q\n\n", subcmd)
+		fs.Usage()
+		os.Exit(2)
 	}
-
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
-
-	backoff := time.Second
-	for ctx.Err() == nil {
-		err := runOnce(ctx, *server, *token, executor)
-		if ctx.Err() != nil {
-			break
-		}
-		log.Printf("session ended: %v", err)
-		log.Printf("reconnecting in %s", backoff)
-		select {
-		case <-time.After(backoff):
-		case <-ctx.Done():
-		}
-		backoff *= 2
-		if backoff > 30*time.Second {
-			backoff = 30 * time.Second
-		}
-	}
-	log.Println("connector exiting")
 }
+
+func runInstall(cfgPath, token, server, execName string) {
+	if token == "" {
+		token = os.Getenv("DATASEAI_TOKEN")
+	}
+	if token == "" {
+		log.Fatal("error: --token required for install (or DATASEAI_TOKEN env)")
+	}
+	if execName == "" {
+		execName = "mysql"
+	}
+	cfg := Config{Token: token, Server: server, Executor: execName}
+	if err := writeConfig(cfgPath, cfg); err != nil {
+		log.Fatalf("write config %s: %v", cfgPath, err)
+	}
+	log.Printf("wrote config: %s", cfgPath)
+
+	svc, err := service.New(&program{cfg: cfg}, newServiceConfig())
+	if err != nil {
+		log.Fatalf("service.New: %v", err)
+	}
+	if err := svc.Install(); err != nil {
+		log.Fatalf("install service: %v (try running with sudo)", err)
+	}
+	log.Printf("installed service: dataseai-connector")
+	if err := svc.Start(); err != nil {
+		log.Printf("start service: %v (you can `dataseai-connector start` later)", err)
+		return
+	}
+	log.Printf("started service")
+}
+
+func runControl(action string) {
+	svc, err := service.New(&program{}, newServiceConfig())
+	if err != nil {
+		log.Fatalf("service.New: %v", err)
+	}
+	if err := service.Control(svc, action); err != nil {
+		log.Fatalf("%s: %v (try with sudo)", action, err)
+	}
+	log.Printf("%s ok", action)
+}
+
+func runStatus() {
+	svc, err := service.New(&program{}, newServiceConfig())
+	if err != nil {
+		log.Fatalf("service.New: %v", err)
+	}
+	st, err := svc.Status()
+	if err != nil {
+		log.Fatalf("status: %v", err)
+	}
+	switch st {
+	case service.StatusRunning:
+		fmt.Println("running")
+	case service.StatusStopped:
+		fmt.Println("stopped")
+	default:
+		fmt.Println("unknown")
+	}
+}
+
+func runForeground(cfgPath, token, server, execName string) {
+	cfg, err := loadConfig(cfgPath)
+	if err != nil && !os.IsNotExist(err) {
+		log.Fatalf("load config: %v", err)
+	}
+	if token == "" {
+		token = os.Getenv("DATASEAI_TOKEN")
+	}
+	if token != "" {
+		cfg.Token = token
+	}
+	if server != "" && server != "wss://dataseai.app/agent" {
+		cfg.Server = server
+	}
+	if cfg.Server == "" {
+		cfg.Server = server
+	}
+	if execName != "" && execName != "mysql" {
+		cfg.Executor = execName
+	}
+	if cfg.Executor == "" {
+		cfg.Executor = execName
+	}
+	if cfg.Token == "" {
+		log.Fatal("error: token required (--token, DATASEAI_TOKEN env, or in config file)")
+	}
+
+	svc, err := service.New(&program{cfg: cfg}, newServiceConfig())
+	if err != nil {
+		log.Fatalf("service.New: %v", err)
+	}
+	// service.Run handles both service and foreground modes; the framework
+	// detects which it's in and dispatches accordingly.
+	if err := svc.Run(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func runService(cfgPath string) {
+	cfg, err := loadConfig(cfgPath)
+	if err != nil {
+		log.Fatalf("load config %s: %v", cfgPath, err)
+	}
+	if cfg.Token == "" {
+		log.Fatalf("config %s has no token", cfgPath)
+	}
+	if cfg.Server == "" {
+		cfg.Server = "wss://dataseai.app/agent"
+	}
+	if cfg.Executor == "" {
+		cfg.Executor = "mysql"
+	}
+	svc, err := service.New(&program{cfg: cfg}, newServiceConfig())
+	if err != nil {
+		log.Fatalf("service.New: %v", err)
+	}
+	if err := svc.Run(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+// --- everything below is the original WebSocket / query plumbing ---
 
 func runOnce(ctx context.Context, server, token string, executor Executor) error {
 	dialCtx, cancel := context.WithTimeout(ctx, 10*time.Second)

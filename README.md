@@ -80,13 +80,27 @@ go run ./cmd/connector --token=anything
 
 ## Install
 
-Coming soon. Planned channels:
+Once a release is published (`make release v=X.Y.Z`), grab the binary or
+package from the [releases page][rel] and install:
 
-- Linux `.deb` / `.rpm`
-- macOS `.pkg` and Homebrew tap
-- Windows `.msi` and `winget`
-- Single binary for every platform
-- Docker image
+```
+# 1. extract the binary or install the .deb/.rpm
+# 2. register as a system service (one-shot, needs sudo)
+sudo dataseai-connector install --token=ag_xxxxx
+
+# manage afterwards:
+sudo dataseai-connector status     # running / stopped
+sudo dataseai-connector restart
+sudo dataseai-connector uninstall  # leaves config file in place
+```
+
+The service writes its config to:
+
+- Linux:   `/etc/dataseai-connector/config.yaml`
+- macOS:   `/Library/Application Support/dataseai-connector/config.yaml`
+- Windows: `%ProgramData%\dataseai-connector\config.yaml`
+
+[rel]: https://github.com/cin-yi-wei/dataseai-connector/releases
 
 ## Roadmap
 
@@ -97,8 +111,8 @@ Coming soon. Planned channels:
 - [x] Query relay protocol (request → meta → rows × N → done | error)
 - [x] Mock executor (50 fake rows, 5 batches)
 - [x] Real MySQL executor (`database/sql` + `go-sql-driver/mysql`)
+- [x] System service install on all 3 platforms (kardianos/service)
 - [ ] Multi-target connector config (which DBs am I allowed to reach?)
-- [ ] System service install (kardianos/service, all platforms)
 - [ ] HTTPS_PROXY support
 - [ ] Auto-update mechanism
 - [ ] Code signing (Apple Developer ID, Windows EV)
