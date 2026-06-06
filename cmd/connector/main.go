@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"net/http"
+	"net/url"
 	"os"
 	"runtime"
 	"sync"
@@ -225,7 +227,9 @@ func runService(cfgPath string) {
 func runOnce(ctx context.Context, server, token string, executor Executor) error {
 	dialCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-	conn, _, err := websocket.Dial(dialCtx, server, nil)
+	conn, _, err := websocket.Dial(dialCtx, server, &websocket.DialOptions{
+		HTTPClient: proxyAwareHTTPClient(),
+	})
 	if err != nil {
 		return fmt.Errorf("dial: %w", err)
 	}
@@ -427,4 +431,41 @@ func isClose(err error) bool {
 	}
 	var nerr net.Error
 	return errors.As(err, &nerr) && nerr.Timeout()
+}
+
+// proxyAwareHTTPClient returns an http.Client whose Transport honors the
+// HTTPS_PROXY / HTTP_PROXY / NO_PROXY environment variables (via Go's
+// http.ProxyFromEnvironment). The dial timeout is the same as the rest of
+// the connector. We log the resolved proxy once per connect so it's clear
+// from the service log which network path is in use.
+func proxyAwareHTTPClient() *http.Client {
+	proxyFn := http.ProxyFromEnvironment
+	if envProxy := firstEnv("HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy"); envProxy != "" {
+		if u, err := url.Parse(envProxy); err == nil {
+			log.Printf("using proxy %s", u.Redacted())
+		}
+	}
+	return &http.Client{
+		Timeout: 0, // WebSocket is long-lived; don't time out reads
+		Transport: &http.Transport{
+			Proxy: proxyFn,
+			DialContext: (&net.Dialer{
+				Timeout:   10 * time.Second,
+				KeepAlive: 30 * time.Second,
+			}).DialContext,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ResponseHeaderTimeout: 10 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+			ForceAttemptHTTP2:     true,
+		},
+	}
+}
+
+func firstEnv(keys ...string) string {
+	for _, k := range keys {
+		if v := os.Getenv(k); v != "" {
+			return v
+		}
+	}
+	return ""
 }

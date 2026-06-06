@@ -112,8 +112,8 @@ The service writes its config to:
 - [x] Mock executor (50 fake rows, 5 batches)
 - [x] Real MySQL executor (`database/sql` + `go-sql-driver/mysql`)
 - [x] System service install on all 3 platforms (kardianos/service)
+- [x] HTTPS_PROXY / HTTP_PROXY / NO_PROXY environment honored
 - [ ] Multi-target connector config (which DBs am I allowed to reach?)
-- [ ] HTTPS_PROXY support
 - [ ] Auto-update mechanism
 - [ ] Code signing (Apple Developer ID, Windows EV)
 
