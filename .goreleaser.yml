@@ -25,8 +25,24 @@ builds:
       - -X main.commit={{.Commit}}
       - -X main.date={{.Date}}
 
+  - id: test-broker
+    binary: dataseai-test-broker
+    main: ./cmd/test-broker
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+
 archives:
-  - id: default
+  - id: connector
+    ids: [connector]
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     formats: [tar.gz]
     format_overrides:
@@ -36,8 +52,19 @@ archives:
       - LICENSE*
       - README*
 
+  - id: test-broker
+    ids: [test-broker]
+    name_template: "{{ .ProjectName }}-test-broker_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - LICENSE*
+
 nfpms:
   - id: linux-packages
+    ids: [connector]
     package_name: dataseai-connector
     vendor: dataseai
     homepage: https://dataseai.app
