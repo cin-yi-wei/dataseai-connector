@@ -33,9 +33,9 @@ type Hello struct {
 }
 
 type HelloAck struct {
-	AgentID   string `json:"agent_id"`
-	SessionID string `json:"session_id"`
-	HeartbeatSeconds int `json:"heartbeat_seconds"`
+	AgentID          string `json:"agent_id"`
+	SessionID        string `json:"session_id"`
+	HeartbeatSeconds int    `json:"heartbeat_seconds"`
 }
 
 type HelloFail struct {
@@ -53,11 +53,25 @@ type Pong struct {
 // MySQLTarget identifies the database the broker wants the connector to
 // run the query against.
 type MySQLTarget struct {
-	Host     string `json:"host"`
-	Port     int    `json:"port"`
-	User     string `json:"user"`
-	Password string `json:"password,omitempty"`
-	Database string `json:"database,omitempty"`
+	Host     string     `json:"host"`
+	Port     int        `json:"port"`
+	User     string     `json:"user"`
+	Password string     `json:"password,omitempty"`
+	Database string     `json:"database,omitempty"`
+	SSH      *SSHConfig `json:"ssh,omitempty"`
+}
+
+type SSHConfig struct {
+	Host          string `json:"host"`
+	Port          int    `json:"port,omitempty"`
+	User          string `json:"user"`
+	Password      string `json:"password,omitempty"`
+	PrivateKey    string `json:"private_key,omitempty"`
+	KeyPassphrase string `json:"key_passphrase,omitempty"`
+}
+
+func (c *SSHConfig) IsZero() bool {
+	return c == nil || c.Host == "" || c.User == ""
 }
 
 // QueryRequest is sent by the broker to ask the connector to execute SQL.
@@ -73,8 +87,8 @@ type QueryRequest struct {
 
 // QueryMeta is the first response after a request. Sent before any rows.
 type QueryMeta struct {
-	RequestID string     `json:"request_id"`
-	Columns   []ColInfo  `json:"columns"`
+	RequestID string    `json:"request_id"`
+	Columns   []ColInfo `json:"columns"`
 }
 
 type ColInfo struct {
