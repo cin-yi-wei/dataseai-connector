@@ -13,6 +13,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -92,20 +94,25 @@ func handleAgent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Demo: send a query 2 seconds after handshake.
+	// Demo: send a query 2 seconds after handshake. Target + SQL can be
+	// overridden via env so this same broker can drive either the mock
+	// executor or a real MySQL behind the connector.
 	go func() {
 		time.Sleep(2 * time.Second)
+		port := atoiOr(os.Getenv("TARGET_PORT"), 3306)
 		req := protocol.QueryRequest{
 			RequestID: "req_" + randID(4),
 			Target: protocol.MySQLTarget{
-				Host:     "10.0.0.50",
-				Port:     3306,
-				User:     "admin",
-				Database: "demo",
+				Host:     envOr("TARGET_HOST", "10.0.0.50"),
+				Port:     port,
+				User:     envOr("TARGET_USER", "admin"),
+				Password: os.Getenv("TARGET_PASS"),
+				Database: envOr("TARGET_DB", "demo"),
 			},
-			SQL: "SELECT id, name, email FROM users LIMIT 50",
+			SQL: envOr("TARGET_SQL", "SELECT id, name, email FROM users LIMIT 50"),
 		}
-		log.Printf("[%s] sending demo query %s", agentID, req.RequestID)
+		log.Printf("[%s] sending demo query %s → %s@%s:%d/%s",
+			agentID, req.RequestID, req.Target.User, req.Target.Host, req.Target.Port, req.Target.Database)
 		if err := s.send(ctx, protocol.Envelope{
 			Type:    protocol.TypeQueryRequest,
 			Payload: req,
@@ -194,4 +201,21 @@ func shortTok(t string) string {
 		return t
 	}
 	return t[:6]
+}
+
+func envOr(key, def string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return def
+}
+
+func atoiOr(s string, def int) int {
+	if s == "" {
+		return def
+	}
+	if v, err := strconv.Atoi(s); err == nil {
+		return v
+	}
+	return def
 }

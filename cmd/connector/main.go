@@ -29,6 +29,7 @@ var (
 func main() {
 	token := flag.String("token", "", "agent token (env: DATASEAI_TOKEN)")
 	server := flag.String("server", "ws://localhost:8080/agent", "broker URL")
+	execName := flag.String("executor", "mysql", "query executor: mysql | mock")
 	flag.Parse()
 
 	if *token == "" {
@@ -41,8 +42,17 @@ func main() {
 	log.Printf("dataseai-connector %s (commit=%s, date=%s)", version, commit, date)
 	log.Printf("system: %s/%s, go=%s", runtime.GOOS, runtime.GOARCH, runtime.Version())
 	log.Printf("server: %s", *server)
+	log.Printf("executor: %s", *execName)
 
-	executor := MockExecutor{} // TODO: real MySQL executor
+	var executor Executor
+	switch *execName {
+	case "mock":
+		executor = MockExecutor{}
+	case "mysql":
+		executor = MySQLExecutor{}
+	default:
+		log.Fatalf("unknown executor %q; valid: mysql | mock", *execName)
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()

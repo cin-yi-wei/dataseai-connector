@@ -41,6 +41,8 @@ go build ./...
 
 ## Run the end-to-end demo
 
+### Mock data (no MySQL needed)
+
 In one terminal:
 
 ```
@@ -50,11 +52,31 @@ go run ./cmd/test-broker
 In another:
 
 ```
-go run ./cmd/connector --token=ag_test_anything --server=ws://localhost:8080/agent
+go run ./cmd/connector --executor=mock --token=anything
 ```
 
-You should see the connector authenticate, exchange ping/pong every 5s, and
-reconnect automatically if the broker goes away.
+You should see the connector authenticate, then 2s later receive a query,
+stream 5 batches of 10 fake rows back, plus ping/pong every 5s.
+
+### Against a real MySQL
+
+Point the broker's hardcoded demo query at a real server via env:
+
+```
+TARGET_HOST=192.168.50.250 \
+TARGET_PORT=3306 \
+TARGET_USER=root \
+TARGET_PASS=secret \
+TARGET_DB=mysql \
+TARGET_SQL="SELECT user, host FROM user LIMIT 5" \
+go run ./cmd/test-broker
+```
+
+And run the connector with `--executor=mysql` (the default):
+
+```
+go run ./cmd/connector --token=anything
+```
 
 ## Install
 
@@ -72,7 +94,10 @@ Coming soon. Planned channels:
 - [x] WebSocket client + reconnect with backoff
 - [x] Hello / HelloAck / Heartbeat protocol
 - [x] Throwaway test broker for local development
-- [ ] Query relay (MySQL execution + streaming results back)
+- [x] Query relay protocol (request → meta → rows × N → done | error)
+- [x] Mock executor (50 fake rows, 5 batches)
+- [x] Real MySQL executor (`database/sql` + `go-sql-driver/mysql`)
+- [ ] Multi-target connector config (which DBs am I allowed to reach?)
 - [ ] System service install (kardianos/service, all platforms)
 - [ ] HTTPS_PROXY support
 - [ ] Auto-update mechanism
