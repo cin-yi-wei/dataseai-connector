@@ -56,7 +56,18 @@ snapshot:
   version_template: "{{ incpatch .Version }}-snapshot"
 
 changelog:
-  disable: true
+  use: github
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^chore:'
 
 release:
-  disable: true
+  github:
+    owner: cin-yi-wei
+    name: dataseai-connector
+  draft: false
+  prerelease: auto       # treat -rc / -beta tags as pre-release
+  name_template: "v{{ .Version }}"
