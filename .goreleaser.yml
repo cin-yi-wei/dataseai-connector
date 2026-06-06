@@ -1,0 +1,60 @@
+version: 2
+
+project_name: dataseai-connector
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: connector
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.date={{.Date}}
+
+archives:
+  - id: default
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - LICENSE*
+      - README*
+
+nfpms:
+  - id: linux-packages
+    package_name: dataseai-connector
+    vendor: dataseai
+    homepage: https://dataseai.app
+    maintainer: cin-yi-wei
+    description: dataseai LAN connector agent
+    license: MIT
+    formats:
+      - deb
+      - rpm
+    bindir: /usr/bin
+
+checksum:
+  name_template: "checksums.txt"
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-snapshot"
+
+changelog:
+  disable: true
+
+release:
+  disable: true
