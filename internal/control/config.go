@@ -59,10 +59,10 @@ func MaskToken(token string) string {
 	if token == "" {
 		return ""
 	}
+	if len(token) <= 3 {
+		return "***"
+	}
 	if len(token) <= 10 {
-		if len(token) <= 3 {
-			return token + "..."
-		}
 		return token[:3] + "..."
 	}
 	return token[:6] + "..." + token[len(token)-4:]

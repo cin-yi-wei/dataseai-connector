@@ -34,6 +34,39 @@ func TestDiagnosticsRedactsToken(t *testing.T) {
 	}
 }
 
+func TestDiagnosticsRedactsShortTokens(t *testing.T) {
+	for _, token := range []string{"ag1", "ag_", "a", ""} {
+		t.Run(token, func(t *testing.T) {
+			diag := NewDiagnostics(DiagnosticsInput{
+				ConfigPath:    "/etc/dataseai-connector/config.yaml",
+				Config:        Config{Token: token, Server: "wss://dataseai.example/agent", Executor: "mysql"},
+				ServiceStatus: ServiceStatusRunning,
+				LogLines:      []string{"connected with token " + token},
+			})
+
+			b, err := json.Marshal(diag)
+			if err != nil {
+				t.Fatalf("marshal diagnostics: %v", err)
+			}
+			got := string(b)
+			if len(token) > 1 && strings.Contains(got, token) {
+				t.Fatalf("diagnostics leaked short token %q: %s", token, got)
+			}
+			if token != "" && strings.Contains(diag.PublicConfig.TokenMasked, token) {
+				t.Fatalf("masked token %q still contains short token %q", diag.PublicConfig.TokenMasked, token)
+			}
+			for _, line := range diag.LogLines {
+				if token != "" && strings.Contains(line, token) {
+					t.Fatalf("log line %q still contains short token %q", line, token)
+				}
+			}
+			if token == "" && diag.PublicConfig.TokenMasked != "" {
+				t.Fatalf("empty token masked as %q, want empty", diag.PublicConfig.TokenMasked)
+			}
+		})
+	}
+}
+
 func TestStatusReportJSON(t *testing.T) {
 	report := StatusReport{ServiceStatus: ServiceStatusStopped}
 
