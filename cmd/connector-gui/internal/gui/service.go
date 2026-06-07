@@ -69,16 +69,15 @@ func InstallAndStart(token, server, executor string) error {
 		"--executor=" + executor,
 	}
 	if _, installErr := runConnector(installArgs...); installErr != nil {
-		// Service might already be installed — update config then start.
-		cfg := Config{Token: token, Server: server, Executor: executor}
-		_ = WriteConfig(DefaultConfigPath(), cfg)
-		if _, startErr := runConnector("start"); startErr != nil {
-			return wrapServiceError("start", startErr)
+		// Service may be registered at an old path (e.g. a previous download folder).
+		// Stop + uninstall the stale entry, then reinstall from the current location.
+		_, _ = runConnector("stop")
+		_, _ = runConnector("uninstall")
+		if _, reinstallErr := runConnector(installArgs...); reinstallErr != nil {
+			return fmt.Errorf("install: %v", reinstallErr)
 		}
-		return nil
 	}
-	// The connector's install subcommand already starts the service;
-	// no need to call start again.
+	// connector install already starts the service.
 	return nil
 }
 
