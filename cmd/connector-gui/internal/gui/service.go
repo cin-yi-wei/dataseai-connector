@@ -72,13 +72,12 @@ func InstallAndStart(token, server, executor string) error {
 		cfg := Config{Token: token, Server: server, Executor: executor}
 		_ = WriteConfig(DefaultConfigPath(), cfg)
 		if _, startErr := runConnector("start"); startErr != nil {
-			return fmt.Errorf("install: %v", installErr)
+			return wrapServiceError("start", startErr)
 		}
 		return nil
 	}
-	if _, err := runConnector("start"); err != nil {
-		return wrapServiceError("start", err)
-	}
+	// The connector's install subcommand already starts the service;
+	// no need to call start again.
 	return nil
 }
 
@@ -103,6 +102,10 @@ func wrapServiceError(action string, err error) error {
 		return nil
 	}
 	msg := err.Error()
+	if strings.Contains(msg, "already running") ||
+		strings.Contains(msg, "already started") {
+		return nil // already running is success
+	}
 	if strings.Contains(msg, "does not exist as an installed service") ||
 		strings.Contains(msg, "not installed") {
 		return fmt.Errorf("service is not installed — use \"Install & Start\" first")
