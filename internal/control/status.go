@@ -31,7 +31,6 @@ type Diagnostics struct {
 	OS            string        `json:"os"`
 	Arch          string        `json:"arch"`
 	ConfigPath    string        `json:"config_path"`
-	Config        Config        `json:"-"`
 	PublicConfig  PublicConfig  `json:"config"`
 	ServiceStatus ServiceStatus `json:"service_status"`
 	AgentStatus   string        `json:"agent_status,omitempty"`
@@ -58,7 +57,6 @@ func NewDiagnostics(input DiagnosticsInput) Diagnostics {
 		OS:         runtime.GOOS,
 		Arch:       runtime.GOARCH,
 		ConfigPath: input.ConfigPath,
-		Config:     input.Config,
 		PublicConfig: PublicConfig{
 			TokenMasked: tokenMasked,
 			Server:      input.Config.Server,

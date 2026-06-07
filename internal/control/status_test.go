@@ -2,6 +2,8 @@ package control
 
 import (
 	"encoding/json"
+	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -31,6 +33,22 @@ func TestDiagnosticsRedactsToken(t *testing.T) {
 	}
 	if !strings.Contains(got, `"executor":"mysql"`) {
 		t.Fatalf("diagnostics missing executor: %s", got)
+	}
+}
+
+func TestDiagnosticsDoesNotStoreRawConfig(t *testing.T) {
+	token := "ag_super_secret_token_1234567890"
+	diag := NewDiagnostics(DiagnosticsInput{
+		ConfigPath:    "/etc/dataseai-connector/config.yaml",
+		Config:        Config{Token: token, Server: "wss://dataseai.example/agent", Executor: "mysql"},
+		ServiceStatus: ServiceStatusRunning,
+	})
+
+	if _, ok := reflect.TypeOf(diag).FieldByName("Config"); ok {
+		t.Fatal("diagnostics must not expose raw config")
+	}
+	if strings.Contains(fmt.Sprintf("%#v", diag), token) {
+		t.Fatal("diagnostics object representation leaked raw token")
 	}
 }
 

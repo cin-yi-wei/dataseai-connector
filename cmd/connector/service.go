@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"runtime"
@@ -87,6 +88,13 @@ func currentServiceStatus() control.ServiceStatus {
 		return control.ServiceStatusUnknown
 	}
 	st, err := svc.Status()
+	return mapServiceStatus(st, err)
+}
+
+func mapServiceStatus(st service.Status, err error) control.ServiceStatus {
+	if errors.Is(err, service.ErrNotInstalled) {
+		return control.ServiceStatusNotInstalled
+	}
 	if err != nil {
 		return control.ServiceStatusUnknown
 	}
