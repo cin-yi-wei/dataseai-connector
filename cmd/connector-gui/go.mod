@@ -2,7 +2,10 @@ module github.com/cin-yi-wei/dataseai-connector-gui
 
 go 1.23.0
 
-require github.com/wailsapp/wails/v2 v2.12.0
+require (
+	github.com/wailsapp/wails/v2 v2.12.0
+	gopkg.in/yaml.v3 v3.0.1
+)
 
 require (
 	git.sr.ht/~jackmordaunt/go-toast/v2 v2.0.3 // indirect
@@ -33,5 +36,4 @@ require (
 	golang.org/x/net v0.35.0 // indirect
 	golang.org/x/sys v0.30.0 // indirect
 	golang.org/x/text v0.22.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

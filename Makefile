@@ -11,6 +11,11 @@
 
 PROJECT_DIR := $(CURDIR)
 BUILD_DIR   := $(PROJECT_DIR)/dist-local
+WAILS       ?= $(shell command -v wails 2>/dev/null || printf "%s/.local/bin/wails" "$$HOME")
+WAILS_BUILD_FLAGS :=
+ifeq ($(shell uname -s),Linux)
+WAILS_BUILD_FLAGS += -tags webkit2_41
+endif
 
 .PHONY: build run-mock snapshot ci push release clean gui-build gui-package-windows
 
@@ -55,11 +60,11 @@ release:
 	@echo "watch: https://github.com/cin-yi-wei/dataseai-connector/actions"
 
 gui-build:
-	cd cmd/connector-gui && wails build
+	cd cmd/connector-gui && $(WAILS) build $(WAILS_BUILD_FLAGS)
 
 gui-package-windows:
 	GOOS=windows GOARCH=amd64 go build -o $(BUILD_DIR)/dataseai-connector.exe ./cmd/connector
-	cd cmd/connector-gui && wails build -platform windows/amd64
+	cd cmd/connector-gui && $(WAILS) build -platform windows/amd64
 
 clean:
 	rm -rf $(BUILD_DIR) dist

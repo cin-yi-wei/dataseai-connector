@@ -1,11 +1,18 @@
-# README
+# DataseAI Connector GUI
 
-## About
+## Linux runtime dependencies
 
-This is the official Wails React-TS template.
+The Linux GUI uses GTK/WebKitGTK through Wails.
 
-You can configure the project by editing `wails.json`. More information about the project settings can be found
-here: https://wails.io/docs/reference/project-config
+Ubuntu 24.04+ / Debian 13+:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y libgtk-3-0 libwebkit2gtk-4.1-0
+```
+
+Older Ubuntu releases that still ship WebKitGTK 4.0 need a GUI binary built
+against 4.0. Current Linux release builds target WebKitGTK 4.1.
 
 ## Live Development
 
@@ -16,4 +23,11 @@ to this in your browser, and you can call your Go code from devtools.
 
 ## Building
 
-To build a redistributable, production mode package, use `wails build`.
+To build a redistributable, production mode package, use:
+
+```bash
+make gui-build
+```
+
+On Linux this adds Wails' `webkit2_41` build tag so the resulting binary links
+against `libwebkit2gtk-4.1.so.0`, which is available on current Ubuntu releases.

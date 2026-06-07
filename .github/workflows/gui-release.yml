@@ -22,7 +22,7 @@ jobs:
             platform: darwin/arm64
             goos: darwin
             goarch: arm64
-          - os: ubuntu-22.04
+          - os: ubuntu-24.04
             platform: linux/amd64
             goos: linux
             goarch: amd64
@@ -44,7 +44,7 @@ jobs:
 
       - name: Install Linux webkit deps
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev
+        run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
 
       - name: macOS diagnostics
         if: runner.os == 'macOS'
@@ -73,7 +73,13 @@ jobs:
 
       - name: Build GUI
         working-directory: cmd/connector-gui
-        run: wails build -platform ${{ matrix.platform }}
+        shell: bash
+        run: |
+          if [ "${{ matrix.goos }}" = "linux" ]; then
+            wails build -platform ${{ matrix.platform }} -tags webkit2_41
+          else
+            wails build -platform ${{ matrix.platform }}
+          fi
 
       - name: Package (Windows)
         if: runner.os == 'Windows'
