@@ -33,6 +33,7 @@ func connectorBinary() string {
 func runConnector(args ...string) (string, error) {
 	bin := connectorBinary()
 	cmd := exec.Command(bin, args...)
+	hideWindow(cmd)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("%s: %w\n%s", strings.Join(append([]string{bin}, args...), " "), err, out)
