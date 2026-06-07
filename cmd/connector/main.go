@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cin-yi-wei/dataseai-connector/internal/control"
 	"github.com/cin-yi-wei/dataseai-connector/pkg/protocol"
 	"github.com/coder/websocket"
 	"github.com/coder/websocket/wsjson"
@@ -62,7 +63,7 @@ func main() {
 	token := fs.String("token", "", "agent token")
 	server := fs.String("server", "wss://dataseai.app/agent", "broker URL")
 	execName := fs.String("executor", "mysql", "query executor")
-	cfgPath := fs.String("config", defaultConfigPath(), "config file path")
+	cfgPath := fs.String("config", control.DefaultConfigPath(), "config file path")
 	fs.Usage = func() { fmt.Fprint(os.Stderr, usage) }
 
 	// First positional arg (if any) is the subcommand.
@@ -110,8 +111,8 @@ func runInstall(cfgPath, token, server, execName string) {
 	if execName == "" {
 		execName = "mysql"
 	}
-	cfg := Config{Token: token, Server: server, Executor: execName}
-	if err := writeConfig(cfgPath, cfg); err != nil {
+	cfg := control.Config{Token: token, Server: server, Executor: execName}
+	if err := control.WriteConfig(cfgPath, cfg); err != nil {
 		log.Fatalf("write config %s: %v", cfgPath, err)
 	}
 	log.Printf("wrote config: %s", cfgPath)
@@ -162,7 +163,7 @@ func runStatus() {
 }
 
 func runForeground(cfgPath, token, server, execName string) {
-	cfg, err := loadConfig(cfgPath)
+	cfg, err := control.LoadConfig(cfgPath)
 	if err != nil && !os.IsNotExist(err) {
 		log.Fatalf("load config: %v", err)
 	}
@@ -200,7 +201,7 @@ func runForeground(cfgPath, token, server, execName string) {
 }
 
 func runService(cfgPath string) {
-	cfg, err := loadConfig(cfgPath)
+	cfg, err := control.LoadConfig(cfgPath)
 	if err != nil {
 		log.Fatalf("load config %s: %v", cfgPath, err)
 	}

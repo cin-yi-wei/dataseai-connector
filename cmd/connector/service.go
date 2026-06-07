@@ -4,67 +4,18 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
-	"path/filepath"
 	"runtime"
 	"time"
 
+	"github.com/cin-yi-wei/dataseai-connector/internal/control"
 	"github.com/kardianos/service"
-	"gopkg.in/yaml.v3"
 )
-
-// Config is what the connector needs to do its job. Loaded from disk on
-// service start, can be overridden by CLI flags during development.
-type Config struct {
-	Token    string `yaml:"token"`
-	Server   string `yaml:"server"`
-	Executor string `yaml:"executor"`
-}
-
-func defaultConfigPath() string {
-	switch runtime.GOOS {
-	case "windows":
-		base := os.Getenv("ProgramData")
-		if base == "" {
-			base = `C:\ProgramData`
-		}
-		return filepath.Join(base, "dataseai-connector", "config.yaml")
-	case "darwin":
-		return "/Library/Application Support/dataseai-connector/config.yaml"
-	default:
-		return "/etc/dataseai-connector/config.yaml"
-	}
-}
-
-func loadConfig(path string) (Config, error) {
-	var cfg Config
-	b, err := os.ReadFile(path)
-	if err != nil {
-		return cfg, err
-	}
-	if err := yaml.Unmarshal(b, &cfg); err != nil {
-		return cfg, fmt.Errorf("parse %s: %w", path, err)
-	}
-	return cfg, nil
-}
-
-func writeConfig(path string, cfg Config) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
-	}
-	b, err := yaml.Marshal(cfg)
-	if err != nil {
-		return err
-	}
-	// 0600: contains the token, only owner should read.
-	return os.WriteFile(path, b, 0o600)
-}
 
 // program implements service.Interface so kardianos can drive us as a
 // system service (systemd / launchd / Windows Service) and also when
 // invoked from a tty.
 type program struct {
-	cfg  Config
+	cfg  control.Config
 	exit chan struct{}
 }
 
