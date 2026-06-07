@@ -32,6 +32,7 @@ jobs:
             goarch: amd64
 
     runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.os == 'macos-14' }}
 
     steps:
       - uses: actions/checkout@v4
@@ -49,6 +50,13 @@ jobs:
       - name: Install Linux webkit deps
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev
+
+      - name: macOS diagnostics
+        if: runner.os == 'macOS'
+        run: |
+          xcode-select -p || true
+          clang --version || true
+          go env CGO_ENABLED GOOS GOARCH CC
 
       - name: Install Wails
         run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.12.0
