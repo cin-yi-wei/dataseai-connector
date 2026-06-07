@@ -31,10 +31,12 @@ type Diagnostics struct {
 	OS            string        `json:"os"`
 	Arch          string        `json:"arch"`
 	ConfigPath    string        `json:"config_path"`
+	LogPath       string        `json:"log_path"`
 	PublicConfig  PublicConfig  `json:"config"`
 	ServiceStatus ServiceStatus `json:"service_status"`
 	AgentStatus   string        `json:"agent_status,omitempty"`
 	LogLines      []string      `json:"log_lines,omitempty"`
+	LogError      string        `json:"log_error,omitempty"`
 }
 
 type DiagnosticsInput struct {
@@ -42,10 +44,12 @@ type DiagnosticsInput struct {
 	Commit        string
 	Date          string
 	ConfigPath    string
+	LogPath       string
 	Config        Config
 	ServiceStatus ServiceStatus
 	AgentStatus   string
 	LogLines      []string
+	LogError      string
 }
 
 func NewDiagnostics(input DiagnosticsInput) Diagnostics {
@@ -57,6 +61,7 @@ func NewDiagnostics(input DiagnosticsInput) Diagnostics {
 		OS:         runtime.GOOS,
 		Arch:       runtime.GOARCH,
 		ConfigPath: input.ConfigPath,
+		LogPath:    input.LogPath,
 		PublicConfig: PublicConfig{
 			TokenMasked: tokenMasked,
 			Server:      input.Config.Server,
@@ -65,6 +70,7 @@ func NewDiagnostics(input DiagnosticsInput) Diagnostics {
 		ServiceStatus: input.ServiceStatus,
 		AgentStatus:   input.AgentStatus,
 		LogLines:      redactToken(input.LogLines, input.Config.Token, tokenMasked),
+		LogError:      input.LogError,
 	}
 }
 

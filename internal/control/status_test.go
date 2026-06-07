@@ -96,3 +96,25 @@ func TestStatusReportJSON(t *testing.T) {
 		t.Fatalf("status JSON = %s, want %s", got, want)
 	}
 }
+
+func TestDiagnosticsIncludesLogPathAndLogError(t *testing.T) {
+	diag := NewDiagnostics(DiagnosticsInput{
+		ConfigPath:    "/etc/dataseai-connector/config.yaml",
+		LogPath:       "/var/log/dataseai-connector.log",
+		Config:        Config{Server: "wss://dataseai.example/agent", Executor: "mysql"},
+		ServiceStatus: ServiceStatusRunning,
+		LogError:      "permission denied",
+	})
+
+	b, err := json.Marshal(diag)
+	if err != nil {
+		t.Fatalf("marshal diagnostics: %v", err)
+	}
+	got := string(b)
+	if !strings.Contains(got, `"log_path":"/var/log/dataseai-connector.log"`) {
+		t.Fatalf("diagnostics missing log_path: %s", got)
+	}
+	if !strings.Contains(got, `"log_error":"permission denied"`) {
+		t.Fatalf("diagnostics missing log_error: %s", got)
+	}
+}

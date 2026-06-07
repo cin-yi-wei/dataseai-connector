@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 	"runtime"
 	"time"
 
@@ -114,4 +116,16 @@ func newServiceConfig() *service.Config {
 		DisplayName: "dataseai Connector",
 		Description: "LAN agent that bridges local MySQL to the dataseai cloud over WebSocket.",
 	}
+}
+
+func setupServiceLogOutput(path string) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		return err
+	}
+	log.SetOutput(f)
+	return nil
 }

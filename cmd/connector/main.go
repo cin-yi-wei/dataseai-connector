@@ -41,6 +41,7 @@ SUBCOMMANDS
   restart     stop + start
   status      print service status (use --json for machine-readable output)
   diagnostics print redacted diagnostics (requires --json)
+  logs        print recent connector log lines
   run         run in the foreground (for development)
   version     print version and exit
 
@@ -52,6 +53,7 @@ FLAGS (for install / run)
   --server=wss://…    broker URL   (default wss://dataseai.app/agent)
   --executor=mysql    mysql | mock (default mysql)
   --config=/path      override config path (default platform-specific)
+  --tail=N            log lines for logs/diagnostics (default 100)
 
 CONFIG FILE
   Linux:   /etc/dataseai-connector/config.yaml
@@ -66,6 +68,7 @@ func main() {
 	execName := fs.String("executor", "mysql", "query executor")
 	cfgPath := fs.String("config", control.DefaultConfigPath(), "config file path")
 	jsonOut := fs.Bool("json", false, "print JSON output")
+	tail := fs.Int("tail", 100, "number of log lines to print")
 	fs.Usage = func() { fmt.Fprint(os.Stderr, usage) }
 
 	// First positional arg (if any) is the subcommand.
@@ -91,7 +94,10 @@ func main() {
 		runStatus(*jsonOut)
 		return
 	case "diagnostics":
-		runDiagnostics(*cfgPath, *jsonOut)
+		runDiagnostics(*cfgPath, *jsonOut, *tail)
+		return
+	case "logs":
+		runLogs(*tail)
 		return
 	case "run":
 		runForeground(*cfgPath, *token, *server, *execName)
@@ -157,7 +163,7 @@ func runStatus(jsonOut bool) {
 	fmt.Println(status)
 }
 
-func runDiagnostics(cfgPath string, jsonOut bool) {
+func runDiagnostics(cfgPath string, jsonOut bool, tail int) {
 	if !jsonOut {
 		log.Fatal("diagnostics currently supports --json output only")
 	}
@@ -165,15 +171,40 @@ func runDiagnostics(cfgPath string, jsonOut bool) {
 	if err != nil && !os.IsNotExist(err) {
 		log.Fatalf("load config %s: %v", cfgPath, err)
 	}
+	logPath := control.DefaultLogPath()
+	logLines, logErr := control.TailLines(logPath, tail)
+	logErrText := ""
+	if logErr != nil && !os.IsNotExist(logErr) {
+		logErrText = logErr.Error()
+	}
 	diag := control.NewDiagnostics(control.DiagnosticsInput{
 		Version:       version,
 		Commit:        commit,
 		Date:          date,
 		ConfigPath:    cfgPath,
+		LogPath:       logPath,
 		Config:        cfg,
 		ServiceStatus: currentServiceStatus(),
+		LogLines:      logLines,
+		LogError:      logErrText,
 	})
 	writeJSON(diag)
+}
+
+func runLogs(tail int) {
+	lines, err := control.TailLines(control.DefaultLogPath(), tail)
+	// A missing file usually means the service has not emitted logs yet. Keep
+	// the command GUI-friendly by returning empty output, but still report real
+	// read failures such as permission errors.
+	if os.IsNotExist(err) {
+		return
+	}
+	if err != nil {
+		log.Fatalf("read log %s: %v", control.DefaultLogPath(), err)
+	}
+	for _, line := range lines {
+		fmt.Println(line)
+	}
 }
 
 func writeJSON(v any) {
@@ -223,6 +254,9 @@ func runForeground(cfgPath, token, server, execName string) {
 }
 
 func runService(cfgPath string) {
+	if err := setupServiceLogOutput(control.DefaultLogPath()); err != nil {
+		log.Printf("service log file unavailable: %v", err)
+	}
 	cfg, err := control.LoadConfig(cfgPath)
 	if err != nil {
 		log.Fatalf("load config %s: %v", cfgPath, err)
