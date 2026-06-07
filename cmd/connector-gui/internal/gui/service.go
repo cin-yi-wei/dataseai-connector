@@ -59,19 +59,19 @@ func InstallAndStart(token, server, executor string) error {
 	if token == "" {
 		return fmt.Errorf("token is required")
 	}
-	cfgPath := DefaultConfigPath()
-	cfg := Config{
-		Token:    token,
-		Server:   server,
-		Executor: executor,
+	// Pass flags directly — the connector's install subcommand writes
+	// the config itself and registers the OS service.
+	installArgs := []string{
+		"install",
+		"--token=" + token,
+		"--server=" + server,
+		"--executor=" + executor,
 	}
-	if err := WriteConfig(cfgPath, cfg); err != nil {
-		return fmt.Errorf("write config: %w", err)
-	}
-	if _, installErr := runConnector("install"); installErr != nil {
-		// Service might already be installed — try starting it.
+	if _, installErr := runConnector(installArgs...); installErr != nil {
+		// Service might already be installed — update config then start.
+		cfg := Config{Token: token, Server: server, Executor: executor}
+		_ = WriteConfig(DefaultConfigPath(), cfg)
 		if _, startErr := runConnector("start"); startErr != nil {
-			// Both failed: surface the original install error.
 			return fmt.Errorf("install: %v", installErr)
 		}
 		return nil
