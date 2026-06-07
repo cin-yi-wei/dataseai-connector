@@ -48,15 +48,7 @@ func (a *App) GetStatus() (GUIStatus, error) {
 }
 
 func (a *App) SaveConfig(token, server, executor string) error {
-	if token == "" {
-		return fmt.Errorf("token is required")
-	}
-	cfg := gui.Config{
-		Token:    token,
-		Server:   server,
-		Executor: executor,
-	}
-	return gui.WriteConfig(gui.DefaultConfigPath(), cfg)
+	return gui.SaveConfig(token, server, executor)
 }
 
 func (a *App) InstallAndStart(token, server, executor string) error {

@@ -32,11 +32,33 @@ func connectorBinary() string {
 
 func runConnector(args ...string) (string, error) {
 	bin := connectorBinary()
-	cmd := exec.Command(bin, args...)
+	name, cmdArgs := connectorCommand(bin, args)
+	return runCommand(name, cmdArgs)
+}
+
+func runElevatedConnector(args ...string) (string, error) {
+	bin := connectorBinary()
+	name, cmdArgs := elevatedConnectorCommand(bin, args)
+	return runCommand(name, cmdArgs)
+}
+
+func connectorCommand(bin string, args []string) (string, []string) {
+	return bin, args
+}
+
+func elevatedConnectorCommand(bin string, args []string) (string, []string) {
+	if runtime.GOOS != "linux" {
+		return connectorCommand(bin, args)
+	}
+	return "pkexec", append([]string{bin}, args...)
+}
+
+func runCommand(name string, args []string) (string, error) {
+	cmd := exec.Command(name, args...)
 	hideWindow(cmd)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return "", fmt.Errorf("%s: %w\n%s", strings.Join(append([]string{bin}, args...), " "), err, out)
+		return "", fmt.Errorf("%s: %w\n%s", strings.Join(append([]string{name}, args...), " "), err, out)
 	}
 	return strings.TrimSpace(string(out)), nil
 }
@@ -60,20 +82,20 @@ func InstallAndStart(token, server, executor string) error {
 	if token == "" {
 		return fmt.Errorf("token is required")
 	}
-	// Pass flags directly — the connector's install subcommand writes
-	// the config itself and registers the OS service.
-	installArgs := []string{
-		"install",
-		"--token=" + token,
-		"--server=" + server,
-		"--executor=" + executor,
+	sourceConfig, err := writeTempConnectorConfig(token, server, executor)
+	if err != nil {
+		return err
 	}
-	if _, installErr := runConnector(installArgs...); installErr != nil {
+	defer os.Remove(sourceConfig)
+
+	installArgs := installArgsFromSourceConfig(sourceConfig, server, executor)
+	runner := serviceControlRunner()
+	if _, installErr := runner(installArgs...); installErr != nil {
 		// Service may be registered at an old path (e.g. a previous download folder).
 		// Stop + uninstall the stale entry, then reinstall from the current location.
-		_, _ = runConnector("stop")
-		_, _ = runConnector("uninstall")
-		if _, reinstallErr := runConnector(installArgs...); reinstallErr != nil {
+		_, _ = runner("stop")
+		_, _ = runner("uninstall")
+		if _, reinstallErr := runner(installArgs...); reinstallErr != nil {
 			return fmt.Errorf("install: %v", reinstallErr)
 		}
 	}
@@ -81,18 +103,91 @@ func InstallAndStart(token, server, executor string) error {
 	return nil
 }
 
+func SaveConfig(token, server, executor string) error {
+	if token == "" {
+		return fmt.Errorf("token is required")
+	}
+	sourceConfig, err := writeTempConnectorConfig(token, server, executor)
+	if err != nil {
+		return err
+	}
+	defer os.Remove(sourceConfig)
+
+	_, err = serviceControlRunner()(configureArgsFromSourceConfig(sourceConfig, server, executor)...)
+	return err
+}
+
+func writeTempConnectorConfig(token, server, executor string) (string, error) {
+	cfg := Config{
+		Token:    token,
+		Server:   server,
+		Executor: executor,
+	}
+	f, err := os.CreateTemp("", "dataseai-connector-gui-*.yaml")
+	if err != nil {
+		return "", err
+	}
+	path := f.Name()
+	if err := f.Close(); err != nil {
+		_ = os.Remove(path)
+		return "", err
+	}
+	if err := WriteConfig(path, cfg); err != nil {
+		_ = os.Remove(path)
+		return "", err
+	}
+	return path, nil
+}
+
+func installArgsFromSourceConfig(sourceConfig, server, executor string) []string {
+	if server == "" {
+		server = DefaultServer
+	}
+	if executor == "" {
+		executor = DefaultExecutor
+	}
+	return []string{
+		"install",
+		"--source-config=" + sourceConfig,
+		"--server=" + server,
+		"--executor=" + executor,
+	}
+}
+
+func configureArgsFromSourceConfig(sourceConfig, server, executor string) []string {
+	if server == "" {
+		server = DefaultServer
+	}
+	if executor == "" {
+		executor = DefaultExecutor
+	}
+	return []string{
+		"configure",
+		"--source-config=" + sourceConfig,
+		"--server=" + server,
+		"--executor=" + executor,
+	}
+}
+
+func serviceControlRunner() func(args ...string) (string, error) {
+	if runtime.GOOS == "linux" {
+		return runElevatedConnector
+	}
+	return runConnector
+}
+
 func Start() error {
-	_, err := runConnector("start")
+	_, err := serviceControlRunner()("start")
 	return wrapServiceError("start", err)
 }
 
 func Stop() error {
-	_, err := runConnector("stop")
+	_, err := serviceControlRunner()("stop")
 	return wrapServiceError("stop", err)
 }
 
 func Restart() error {
-	_, err := runConnector("restart")
+	_, err := serviceControlRunner()("restart")
 	return wrapServiceError("restart", err)
 }
 

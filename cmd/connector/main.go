@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"runtime"
+	"strconv"
 	"sync"
 	"time"
 
@@ -35,6 +36,7 @@ USAGE
 
 SUBCOMMANDS
   install     write config file and register as a system service
+  configure   write config file without changing service registration
   uninstall   stop, unregister, leave config file in place
   start       start the installed service
   stop        stop the installed service
@@ -53,6 +55,7 @@ FLAGS (for install / run)
   --server=wss://…    broker URL   (default wss://dataseai.app/agent)
   --executor=mysql    mysql | mock (default mysql)
   --config=/path      override config path (default platform-specific)
+  --source-config=/path  read install values from an existing config
   --tail=N            log lines for logs/diagnostics (default 100)
 
 CONFIG FILE
@@ -67,6 +70,7 @@ func main() {
 	server := fs.String("server", "wss://dataseai.app/agent", "broker URL")
 	execName := fs.String("executor", "mysql", "query executor")
 	cfgPath := fs.String("config", control.DefaultConfigPath(), "config file path")
+	sourceCfgPath := fs.String("source-config", "", "source config path for install")
 	jsonOut := fs.Bool("json", false, "print JSON output")
 	tail := fs.Int("tail", 100, "number of log lines to print")
 	fs.Usage = func() { fmt.Fprint(os.Stderr, usage) }
@@ -79,13 +83,44 @@ func main() {
 	} else {
 		_ = fs.Parse(os.Args[1:])
 	}
+	seenFlags := map[string]bool{}
+	fs.Visit(func(f *flag.Flag) {
+		seenFlags[f.Name] = true
+	})
 
 	switch subcmd {
 	case "version":
 		fmt.Printf("dataseai-connector %s (commit=%s, date=%s)\n", version, commit, date)
 		return
 	case "install":
-		runInstall(*cfgPath, *token, *server, *execName)
+		input := installConfigInput{
+			SourceConfigPath: *sourceCfgPath,
+		}
+		if seenFlags["token"] {
+			input.Token = *token
+		}
+		if seenFlags["server"] {
+			input.Server = *server
+		}
+		if seenFlags["executor"] {
+			input.Executor = *execName
+		}
+		runInstall(*cfgPath, input)
+		return
+	case "configure":
+		input := installConfigInput{
+			SourceConfigPath: *sourceCfgPath,
+		}
+		if seenFlags["token"] {
+			input.Token = *token
+		}
+		if seenFlags["server"] {
+			input.Server = *server
+		}
+		if seenFlags["executor"] {
+			input.Executor = *execName
+		}
+		runConfigure(*cfgPath, input)
 		return
 	case "uninstall", "start", "stop", "restart":
 		runControl(subcmd)
@@ -112,20 +147,54 @@ func main() {
 	}
 }
 
-func runInstall(cfgPath, token, server, execName string) {
+type installConfigInput struct {
+	SourceConfigPath string
+	Token            string
+	Server           string
+	Executor         string
+}
+
+func buildInstallConfig(input installConfigInput) (control.Config, error) {
+	var cfg control.Config
+	if input.SourceConfigPath != "" {
+		loaded, err := control.LoadConfig(input.SourceConfigPath)
+		if err != nil {
+			return cfg, fmt.Errorf("load source config %s: %w", input.SourceConfigPath, err)
+		}
+		cfg = loaded
+	}
+	token := input.Token
 	if token == "" {
 		token = os.Getenv("DATASEAI_TOKEN")
 	}
 	if token == "" {
-		log.Fatal("error: --token required for install (or DATASEAI_TOKEN env)")
+		token = cfg.Token
 	}
-	if execName == "" {
-		execName = "mysql"
+	if token == "" {
+		return cfg, errors.New("--token required for install (or DATASEAI_TOKEN env)")
 	}
-	cfg := control.Config{Token: token, Server: server, Executor: execName}
-	if err := control.WriteConfig(cfgPath, cfg); err != nil {
-		log.Fatalf("write config %s: %v", cfgPath, err)
+	cfg.Token = token
+	if input.Server != "" {
+		cfg.Server = input.Server
 	}
+	if cfg.Server == "" {
+		cfg.Server = "wss://dataseai.app/agent"
+	}
+	if input.Executor != "" {
+		cfg.Executor = input.Executor
+	}
+	if cfg.Executor == "" {
+		cfg.Executor = "mysql"
+	}
+	return cfg, nil
+}
+
+func runInstall(cfgPath string, input installConfigInput) {
+	cfg, err := buildInstallConfig(input)
+	if err != nil {
+		log.Fatalf("error: %v", err)
+	}
+	writeServiceConfig(cfgPath, cfg)
 	log.Printf("wrote config: %s", cfgPath)
 
 	svc, err := service.New(&program{cfg: cfg}, newServiceConfig())
@@ -141,6 +210,39 @@ func runInstall(cfgPath, token, server, execName string) {
 		return
 	}
 	log.Printf("started service")
+}
+
+func runConfigure(cfgPath string, input installConfigInput) {
+	cfg, err := buildInstallConfig(input)
+	if err != nil {
+		log.Fatalf("error: %v", err)
+	}
+	writeServiceConfig(cfgPath, cfg)
+	log.Printf("wrote config: %s", cfgPath)
+}
+
+func writeServiceConfig(cfgPath string, cfg control.Config) {
+	if err := control.WriteConfig(cfgPath, cfg); err != nil {
+		log.Fatalf("write config %s: %v", cfgPath, err)
+	}
+	if err := maybeChownConfigForPkexecUser(cfgPath); err != nil {
+		log.Fatalf("chown config %s: %v", cfgPath, err)
+	}
+}
+
+func maybeChownConfigForPkexecUser(path string) error {
+	if runtime.GOOS != "linux" {
+		return nil
+	}
+	uidText := os.Getenv("PKEXEC_UID")
+	if uidText == "" {
+		return nil
+	}
+	uid, err := strconv.Atoi(uidText)
+	if err != nil {
+		return fmt.Errorf("invalid PKEXEC_UID %q: %w", uidText, err)
+	}
+	return os.Chown(path, uid, -1)
 }
 
 func runControl(action string) {

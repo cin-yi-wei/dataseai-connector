@@ -14,6 +14,12 @@ sudo apt-get install -y libgtk-3-0 libwebkit2gtk-4.1-0
 Older Ubuntu releases that still ship WebKitGTK 4.0 need a GUI binary built
 against 4.0. Current Linux release builds target WebKitGTK 4.1.
 
+## Linux service permissions
+
+Enter the agent token in the GUI. The GUI writes it to a temporary 0600 config
+file and uses `pkexec` for service install/start/stop actions, so users should
+not paste tokens into a terminal command.
+
 ## Live Development
 
 To run in live development mode, run `wails dev` in the project directory. This will run a Vite development

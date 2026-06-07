@@ -3,6 +3,7 @@ package gui
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -97,5 +98,42 @@ func TestTailLinesMissingFileReturnsNil(t *testing.T) {
 	}
 	if got != nil {
 		t.Fatalf("expected nil lines, got %v", got)
+	}
+}
+
+func TestInstallArgsDoNotExposeToken(t *testing.T) {
+	token := "ag_secret_token_from_gui"
+	args := installArgsFromSourceConfig("/tmp/gui-config.yaml", "wss://dataseai.conray.top/agent", "mysql")
+	joined := strings.Join(args, " ")
+	if strings.Contains(joined, token) {
+		t.Fatalf("install args leaked token: %s", joined)
+	}
+	if !strings.Contains(joined, "--source-config=/tmp/gui-config.yaml") {
+		t.Fatalf("install args missing source config: %v", args)
+	}
+}
+
+func TestConfigureArgsDoNotExposeToken(t *testing.T) {
+	token := "ag_secret_token_from_gui"
+	args := configureArgsFromSourceConfig("/tmp/gui-config.yaml", "wss://dataseai.conray.top/agent", "mysql")
+	joined := strings.Join(args, " ")
+	if strings.Contains(joined, token) {
+		t.Fatalf("configure args leaked token: %s", joined)
+	}
+	if !strings.Contains(joined, "--source-config=/tmp/gui-config.yaml") {
+		t.Fatalf("configure args missing source config: %v", args)
+	}
+}
+
+func TestLinuxElevatedCommandUsesPkexec(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("pkexec wrapping is Linux-specific")
+	}
+	name, args := elevatedConnectorCommand("dataseai-connector", []string{"install"})
+	if name != "pkexec" {
+		t.Fatalf("command = %q, want pkexec", name)
+	}
+	if len(args) != 2 || args[0] != "dataseai-connector" || args[1] != "install" {
+		t.Fatalf("args = %#v", args)
 	}
 }
