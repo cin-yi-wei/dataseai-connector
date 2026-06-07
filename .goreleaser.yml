@@ -98,3 +98,4 @@ release:
   draft: false
   prerelease: auto       # treat -rc / -beta tags as pre-release
   name_template: "v{{ .Version }}"
+  replace_existing_artifacts: true
