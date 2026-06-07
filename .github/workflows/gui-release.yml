@@ -32,7 +32,6 @@ jobs:
             goarch: amd64
 
     runs-on: ${{ matrix.os }}
-    continue-on-error: ${{ matrix.os == 'macos-14' }}
 
     steps:
       - uses: actions/checkout@v4
@@ -100,8 +99,9 @@ jobs:
           VER=$(echo "${{ github.ref_name }}" | sed 's/^v//')
           NAME="dataseai-connector-gui_${VER}_${{ matrix.goos }}_${{ matrix.goarch }}"
           mkdir -p "$NAME"
-          if [ -d "cmd/connector-gui/build/bin/dataseai-connector-gui.app" ]; then
-            cp -r cmd/connector-gui/build/bin/dataseai-connector-gui.app "$NAME/"
+          APP=$(find cmd/connector-gui/build/bin -maxdepth 1 -name "*.app" -type d | head -1)
+          if [ -n "$APP" ]; then
+            cp -r "$APP" "$NAME/"
           elif [ -f "cmd/connector-gui/build/bin/dataseai-connector-gui" ]; then
             cp cmd/connector-gui/build/bin/dataseai-connector-gui "$NAME/"
           else
