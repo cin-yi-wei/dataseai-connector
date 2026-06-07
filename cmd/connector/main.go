@@ -133,7 +133,7 @@ func runInstall(cfgPath, token, server, execName string) {
 		log.Fatalf("service.New: %v", err)
 	}
 	if err := svc.Install(); err != nil {
-		log.Fatalf("install service: %v (try running with sudo)", err)
+		log.Fatalf("install service: %v (%s)", err, elevateHint())
 	}
 	log.Printf("installed service: dataseai-connector")
 	if err := svc.Start(); err != nil {
@@ -149,9 +149,16 @@ func runControl(action string) {
 		log.Fatalf("service.New: %v", err)
 	}
 	if err := service.Control(svc, action); err != nil {
-		log.Fatalf("%s: %v (try with sudo)", action, err)
+		log.Fatalf("%s: %v (%s)", action, err, elevateHint())
 	}
 	log.Printf("%s ok", action)
+}
+
+func elevateHint() string {
+	if runtime.GOOS == "windows" {
+		return "run as Administrator"
+	}
+	return "try with sudo"
 }
 
 func runStatus(jsonOut bool) {

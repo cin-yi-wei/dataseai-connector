@@ -78,16 +78,35 @@ func InstallAndStart(token, server, executor string) error {
 
 func Start() error {
 	_, err := runConnector("start")
-	return err
+	return wrapServiceError("start", err)
 }
 
 func Stop() error {
 	_, err := runConnector("stop")
-	return err
+	return wrapServiceError("stop", err)
 }
 
 func Restart() error {
 	_, err := runConnector("restart")
+	return wrapServiceError("restart", err)
+}
+
+// wrapServiceError converts low-level service errors into user-friendly messages.
+func wrapServiceError(action string, err error) error {
+	if err == nil {
+		return nil
+	}
+	msg := err.Error()
+	if strings.Contains(msg, "does not exist as an installed service") ||
+		strings.Contains(msg, "not installed") {
+		return fmt.Errorf("service is not installed — use \"Install & Start\" first")
+	}
+	if strings.Contains(msg, "Access is denied") || strings.Contains(msg, "permission denied") {
+		if runtime.GOOS == "windows" {
+			return fmt.Errorf("%s failed: %w (run the GUI as Administrator)", action, err)
+		}
+		return fmt.Errorf("%s failed: %w (try running with sudo)", action, err)
+	}
 	return err
 }
 
