@@ -7,3 +7,5 @@ dist/
 .vscode/
 .worktrees
 .worktrees/
+cmd/connector-gui/frontend/node_modules/
+cmd/connector-gui/build/bin/

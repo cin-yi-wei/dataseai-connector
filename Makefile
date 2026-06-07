@@ -12,7 +12,7 @@
 PROJECT_DIR := $(CURDIR)
 BUILD_DIR   := $(PROJECT_DIR)/dist-local
 
-.PHONY: build run-mock snapshot ci push release clean
+.PHONY: build run-mock snapshot ci push release clean gui-build gui-package-windows
 
 build:
 	mkdir -p $(BUILD_DIR)
@@ -53,6 +53,13 @@ release:
 	cd $(PROJECT_DIR) && git push origin "v$(v)"
 	@echo "→ GH Actions will build + publish in ~3 min"
 	@echo "watch: https://github.com/cin-yi-wei/dataseai-connector/actions"
+
+gui-build:
+	cd cmd/connector-gui && wails build
+
+gui-package-windows:
+	GOOS=windows GOARCH=amd64 go build -o $(BUILD_DIR)/dataseai-connector.exe ./cmd/connector
+	cd cmd/connector-gui && wails build -platform windows/amd64
 
 clean:
 	rm -rf $(BUILD_DIR) dist
