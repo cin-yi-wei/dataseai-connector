@@ -68,12 +68,18 @@ func InstallAndStart(token, server, executor string) error {
 	if err := WriteConfig(cfgPath, cfg); err != nil {
 		return fmt.Errorf("write config: %w", err)
 	}
-	if _, err := runConnector("install"); err != nil {
-		_, _ = runConnector("start")
+	if _, installErr := runConnector("install"); installErr != nil {
+		// Service might already be installed — try starting it.
+		if _, startErr := runConnector("start"); startErr != nil {
+			// Both failed: surface the original install error.
+			return fmt.Errorf("install: %v", installErr)
+		}
 		return nil
 	}
-	_, err := runConnector("start")
-	return err
+	if _, err := runConnector("start"); err != nil {
+		return wrapServiceError("start", err)
+	}
+	return nil
 }
 
 func Start() error {
