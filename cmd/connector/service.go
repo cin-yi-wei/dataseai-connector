@@ -81,6 +81,25 @@ func buildExecutor(name string) (Executor, error) {
 	}
 }
 
+func currentServiceStatus() control.ServiceStatus {
+	svc, err := service.New(&program{}, newServiceConfig())
+	if err != nil {
+		return control.ServiceStatusUnknown
+	}
+	st, err := svc.Status()
+	if err != nil {
+		return control.ServiceStatusUnknown
+	}
+	switch st {
+	case service.StatusRunning:
+		return control.ServiceStatusRunning
+	case service.StatusStopped:
+		return control.ServiceStatusStopped
+	default:
+		return control.ServiceStatusUnknown
+	}
+}
+
 func newServiceConfig() *service.Config {
 	return &service.Config{
 		Name:        "dataseai-connector",

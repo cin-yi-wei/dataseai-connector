@@ -39,7 +39,8 @@ SUBCOMMANDS
   start       start the installed service
   stop        stop the installed service
   restart     stop + start
-  status      print service status
+  status      print service status (use --json for machine-readable output)
+  diagnostics print redacted diagnostics (requires --json)
   run         run in the foreground (for development)
   version     print version and exit
 
@@ -64,6 +65,7 @@ func main() {
 	server := fs.String("server", "wss://dataseai.app/agent", "broker URL")
 	execName := fs.String("executor", "mysql", "query executor")
 	cfgPath := fs.String("config", control.DefaultConfigPath(), "config file path")
+	jsonOut := fs.Bool("json", false, "print JSON output")
 	fs.Usage = func() { fmt.Fprint(os.Stderr, usage) }
 
 	// First positional arg (if any) is the subcommand.
@@ -86,7 +88,10 @@ func main() {
 		runControl(subcmd)
 		return
 	case "status":
-		runStatus()
+		runStatus(*jsonOut)
+		return
+	case "diagnostics":
+		runDiagnostics(*cfgPath, *jsonOut)
 		return
 	case "run":
 		runForeground(*cfgPath, *token, *server, *execName)
@@ -143,22 +148,39 @@ func runControl(action string) {
 	log.Printf("%s ok", action)
 }
 
-func runStatus() {
-	svc, err := service.New(&program{}, newServiceConfig())
-	if err != nil {
-		log.Fatalf("service.New: %v", err)
+func runStatus(jsonOut bool) {
+	status := currentServiceStatus()
+	if jsonOut {
+		writeJSON(control.StatusReport{ServiceStatus: status})
+		return
 	}
-	st, err := svc.Status()
-	if err != nil {
-		log.Fatalf("status: %v", err)
+	fmt.Println(status)
+}
+
+func runDiagnostics(cfgPath string, jsonOut bool) {
+	if !jsonOut {
+		log.Fatal("diagnostics currently supports --json output only")
 	}
-	switch st {
-	case service.StatusRunning:
-		fmt.Println("running")
-	case service.StatusStopped:
-		fmt.Println("stopped")
-	default:
-		fmt.Println("unknown")
+	cfg, err := control.LoadConfig(cfgPath)
+	if err != nil && !os.IsNotExist(err) {
+		log.Fatalf("load config %s: %v", cfgPath, err)
+	}
+	diag := control.NewDiagnostics(control.DiagnosticsInput{
+		Version:       version,
+		Commit:        commit,
+		Date:          date,
+		ConfigPath:    cfgPath,
+		Config:        cfg,
+		ServiceStatus: currentServiceStatus(),
+	})
+	writeJSON(diag)
+}
+
+func writeJSON(v any) {
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(v); err != nil {
+		log.Fatalf("write json: %v", err)
 	}
 }
 
