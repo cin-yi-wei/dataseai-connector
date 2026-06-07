@@ -3,25 +3,78 @@ package main
 import (
 	"context"
 	"fmt"
+
+	"github.com/cin-yi-wei/dataseai-connector-gui/internal/gui"
 )
 
-// App struct
 type App struct {
 	ctx context.Context
 }
 
-// NewApp creates a new App application struct
 func NewApp() *App {
 	return &App{}
 }
 
-// startup is called when the app starts. The context is saved
-// so we can call the runtime methods
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 }
 
-// Greet returns a greeting for the given name
-func (a *App) Greet(name string) string {
-	return fmt.Sprintf("Hello %s, It's show time!", name)
+type GUIStatus struct {
+	ServiceStatus string   `json:"service_status"`
+	AgentStatus   string   `json:"agent_status"`
+	ConfigPath    string   `json:"config_path"`
+	Server        string   `json:"server"`
+	Executor      string   `json:"executor"`
+	TokenMasked   string   `json:"token_masked"`
+	LogLines      []string `json:"log_lines"`
+}
+
+func (a *App) GetStatus() (GUIStatus, error) {
+	cfgPath := gui.DefaultConfigPath()
+	cfg, err := gui.LoadConfig(cfgPath)
+	if err != nil {
+		return GUIStatus{ConfigPath: cfgPath}, fmt.Errorf("load config: %w", err)
+	}
+	logs, _ := gui.TailLines(gui.DefaultLogPath(), 100)
+	return GUIStatus{
+		ServiceStatus: gui.ServiceStatus(),
+		AgentStatus:   "",
+		ConfigPath:    cfgPath,
+		Server:        cfg.Server,
+		Executor:      cfg.Executor,
+		TokenMasked:   gui.MaskToken(cfg.Token),
+		LogLines:      logs,
+	}, nil
+}
+
+func (a *App) SaveConfig(token, server, executor string) error {
+	if token == "" {
+		return fmt.Errorf("token is required")
+	}
+	cfg := gui.Config{
+		Token:    token,
+		Server:   server,
+		Executor: executor,
+	}
+	return gui.WriteConfig(gui.DefaultConfigPath(), cfg)
+}
+
+func (a *App) InstallAndStart(token, server, executor string) error {
+	return gui.InstallAndStart(token, server, executor)
+}
+
+func (a *App) Start() error {
+	return gui.Start()
+}
+
+func (a *App) Stop() error {
+	return gui.Stop()
+}
+
+func (a *App) Restart() error {
+	return gui.Restart()
+}
+
+func (a *App) CopyDiagnostics() (string, error) {
+	return gui.Diagnostics()
 }
