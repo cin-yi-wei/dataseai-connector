@@ -11,8 +11,12 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
+	"os/user"
+	"path/filepath"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -231,18 +235,42 @@ func writeServiceConfig(cfgPath string, cfg control.Config) {
 }
 
 func maybeChownConfigForPkexecUser(path string) error {
-	if runtime.GOOS != "linux" {
+	switch runtime.GOOS {
+	case "linux":
+		uidText := os.Getenv("PKEXEC_UID")
+		if uidText == "" {
+			return nil
+		}
+		uid, err := strconv.Atoi(uidText)
+		if err != nil {
+			return fmt.Errorf("invalid PKEXEC_UID %q: %w", uidText, err)
+		}
+		return os.Chown(path, uid, -1)
+	case "darwin":
+		// When invoked via osascript "with administrator privileges" the process
+		// runs as root. Chown the config dir and file back to the console user so
+		// the GUI (running as a regular user) can read them.
+		out, err := exec.Command("stat", "-f%Su", "/dev/console").Output()
+		if err != nil {
+			return nil // best-effort
+		}
+		username := strings.TrimSpace(string(out))
+		if username == "" || username == "root" {
+			return nil
+		}
+		u, err := user.Lookup(username)
+		if err != nil {
+			return nil // best-effort
+		}
+		uid, err := strconv.Atoi(u.Uid)
+		if err != nil {
+			return nil
+		}
+		_ = os.Chown(filepath.Dir(path), uid, -1)
+		return os.Chown(path, uid, -1)
+	default:
 		return nil
 	}
-	uidText := os.Getenv("PKEXEC_UID")
-	if uidText == "" {
-		return nil
-	}
-	uid, err := strconv.Atoi(uidText)
-	if err != nil {
-		return fmt.Errorf("invalid PKEXEC_UID %q: %w", uidText, err)
-	}
-	return os.Chown(path, uid, -1)
 }
 
 func runControl(action string) {
