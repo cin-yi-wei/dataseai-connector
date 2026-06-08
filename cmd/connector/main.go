@@ -202,6 +202,11 @@ func runInstall(cfgPath string, input installConfigInput) {
 	writeServiceConfig(cfgPath, cfg)
 	log.Printf("wrote config: %s", cfgPath)
 
+	if isDarwin {
+		darwinInstall()
+		return
+	}
+
 	svc, err := service.New(&program{cfg: cfg}, newServiceConfig())
 	if err != nil {
 		log.Fatalf("service.New: %v", err)
@@ -299,6 +304,10 @@ func maybeChownConfigForPkexecUser(path string) error {
 }
 
 func runControl(action string) {
+	if isDarwin {
+		darwinControl(action)
+		return
+	}
 	svc, err := service.New(&program{}, newServiceConfig())
 	if err != nil {
 		log.Fatalf("service.New: %v", err)

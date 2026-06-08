@@ -85,6 +85,9 @@ func buildExecutor(name string) (Executor, error) {
 }
 
 func currentServiceStatus() control.ServiceStatus {
+	if isDarwin {
+		return darwinCurrentServiceStatus()
+	}
 	svc, err := service.New(&program{}, newServiceConfig())
 	if err != nil {
 		return control.ServiceStatusUnknown
