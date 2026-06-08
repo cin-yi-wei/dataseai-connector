@@ -13,21 +13,30 @@ import (
 // connectorBinary returns the path to the dataseai-connector binary.
 // Looks next to the GUI executable first, then falls back to PATH.
 func connectorBinary() string {
+	name := "dataseai-connector"
+	if runtime.GOOS == "windows" {
+		name += ".exe"
+	}
 	exe, err := os.Executable()
 	if err == nil {
-		name := "dataseai-connector"
-		if runtime.GOOS == "windows" {
-			name += ".exe"
-		}
-		candidate := filepath.Join(filepath.Dir(exe), name)
-		if _, err := os.Stat(candidate); err == nil {
-			return candidate
+		for _, candidate := range connectorBinaryCandidates(exe, name) {
+			if _, err := os.Stat(candidate); err == nil {
+				return candidate
+			}
 		}
 	}
-	if runtime.GOOS == "windows" {
-		return "dataseai-connector.exe"
+	return name
+}
+
+func connectorBinaryCandidates(exePath, name string) []string {
+	exeDir := filepath.Dir(exePath)
+	candidates := []string{filepath.Join(exeDir, name)}
+	if filepath.Base(exeDir) == "MacOS" &&
+		filepath.Base(filepath.Dir(exeDir)) == "Contents" &&
+		strings.HasSuffix(filepath.Base(filepath.Dir(filepath.Dir(exeDir))), ".app") {
+		candidates = append(candidates, filepath.Clean(filepath.Join(exeDir, "..", "..", "..", name)))
 	}
-	return "dataseai-connector"
+	return candidates
 }
 
 func runConnector(args ...string) (string, error) {

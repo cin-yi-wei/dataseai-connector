@@ -137,3 +137,42 @@ func TestLinuxElevatedCommandUsesPkexec(t *testing.T) {
 		t.Fatalf("args = %#v", args)
 	}
 }
+
+func TestConnectorBinaryCandidatesIncludeMacAppArchiveSibling(t *testing.T) {
+	exe := filepath.Join(
+		"/tmp/dataseai-connector-gui_0.3.6_darwin_arm64",
+		"DataseAI Connector.app",
+		"Contents",
+		"MacOS",
+		"dataseai-connector-gui",
+	)
+	candidates := connectorBinaryCandidates(exe, "dataseai-connector")
+	want := filepath.Join("/tmp/dataseai-connector-gui_0.3.6_darwin_arm64", "dataseai-connector")
+	if !containsString(candidates, want) {
+		t.Fatalf("candidates missing archive sibling %q: %#v", want, candidates)
+	}
+}
+
+func TestConnectorBinaryCandidatesPreferExecutableDirectory(t *testing.T) {
+	exe := filepath.Join(
+		"/Applications",
+		"DataseAI Connector.app",
+		"Contents",
+		"MacOS",
+		"dataseai-connector-gui",
+	)
+	candidates := connectorBinaryCandidates(exe, "dataseai-connector")
+	want := filepath.Join("/Applications", "DataseAI Connector.app", "Contents", "MacOS", "dataseai-connector")
+	if len(candidates) == 0 || candidates[0] != want {
+		t.Fatalf("first candidate = %q, want %q; all=%#v", candidates[0], want, candidates)
+	}
+}
+
+func containsString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
+}

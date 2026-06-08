@@ -103,13 +103,15 @@ jobs:
           mkdir -p "$NAME"
           APP=$(find cmd/connector-gui/build/bin -maxdepth 1 -name "*.app" -type d | head -1)
           if [ -n "$APP" ]; then
+            cp staging/dataseai-connector "$APP/Contents/MacOS/dataseai-connector"
+            chmod +x "$APP/Contents/MacOS/dataseai-connector"
             cp -r "$APP" "$NAME/"
           elif [ -f "cmd/connector-gui/build/bin/dataseai-connector-gui" ]; then
             cp cmd/connector-gui/build/bin/dataseai-connector-gui "$NAME/"
+            cp staging/dataseai-connector "$NAME/"
           else
             echo "ERROR: no GUI binary found"; ls cmd/connector-gui/build/bin/ || true; exit 1
           fi
-          cp staging/dataseai-connector "$NAME/"
           cp cmd/connector-gui/README.md "$NAME/"
           tar czf "${NAME}.tar.gz" "$NAME"
           echo "ASSET=${NAME}.tar.gz" >> "$GITHUB_ENV"
