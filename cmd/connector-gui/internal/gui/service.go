@@ -91,6 +91,11 @@ func InstallAndStart(token, server, executor string) error {
 	if token == "" {
 		return fmt.Errorf("token is required")
 	}
+	if runtime.GOOS == "darwin" {
+		if err := checkNotTranslocated(); err != nil {
+			return err
+		}
+	}
 	sourceConfig, err := writeTempConnectorConfig(token, server, executor)
 	if err != nil {
 		return err
@@ -176,6 +181,21 @@ func configureArgsFromSourceConfig(sourceConfig, server, executor string) []stri
 		"--server=" + server,
 		"--executor=" + executor,
 	}
+}
+
+// checkNotTranslocated returns an error if the app is running from a macOS
+// App Translocation path. The LaunchAgent plist embeds the binary path, so
+// installing from a translocation path produces a stale plist that breaks
+// on every subsequent launch.
+func checkNotTranslocated() error {
+	exe, err := os.Executable()
+	if err != nil {
+		return nil // can't tell; let install proceed
+	}
+	if strings.Contains(exe, "/AppTranslocation/") {
+		return fmt.Errorf("請先將 DataseAI Connector.app 移至「應用程式」資料夾，再重新開啟後安裝。\n\n(The app is running from a temporary location. Move DataseAI Connector.app to your Applications folder and reopen it before installing.)")
+	}
+	return nil
 }
 
 func serviceControlRunner() func(args ...string) (string, error) {
