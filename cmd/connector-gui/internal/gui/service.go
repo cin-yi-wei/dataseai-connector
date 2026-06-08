@@ -102,16 +102,19 @@ func InstallAndStart(token, server, executor string) error {
 	}
 	defer os.Remove(sourceConfig)
 
-	installArgs := installArgsFromSourceConfig(sourceConfig, server, executor)
+	// Clear quarantine so launchd can execute the binary (macOS marks
+	// downloaded files; launchctl returns I/O error 5 if quarantine is set).
+	if runtime.GOOS == "darwin" {
+		exec.Command("xattr", "-d", "com.apple.quarantine", connectorBinary()).Run()
+	}
+
 	runner := serviceControlRunner()
-	if _, installErr := runner(installArgs...); installErr != nil {
-		// Service may be registered at an old path (e.g. a previous download folder).
-		// Stop + uninstall the stale entry, then reinstall from the current location.
-		_, _ = runner("stop")
-		_, _ = runner("uninstall")
-		if _, reinstallErr := runner(installArgs...); reinstallErr != nil {
-			return fmt.Errorf("install: %v", reinstallErr)
-		}
+	// Always start clean: uninstall any stale plist (old path, old version)
+	// before registering fresh.
+	_, _ = runner("stop")
+	_, _ = runner("uninstall")
+	if _, installErr := runner(installArgsFromSourceConfig(sourceConfig, server, executor)...); installErr != nil {
+		return fmt.Errorf("install: %v", installErr)
 	}
 	// connector install already starts the service.
 	return nil
