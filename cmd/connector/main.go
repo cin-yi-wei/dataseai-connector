@@ -198,6 +198,7 @@ func runInstall(cfgPath string, input installConfigInput) {
 	if err != nil {
 		log.Fatalf("error: %v", err)
 	}
+	migrateFromSystemDaemon()
 	writeServiceConfig(cfgPath, cfg)
 	log.Printf("wrote config: %s", cfgPath)
 
@@ -231,6 +232,30 @@ func writeServiceConfig(cfgPath string, cfg control.Config) {
 	}
 	if err := maybeChownConfigForPkexecUser(cfgPath); err != nil {
 		log.Fatalf("chown config %s: %v", cfgPath, err)
+	}
+}
+
+// migrateFromSystemDaemon removes a legacy system-level LaunchDaemon left by
+// older connector versions before we switched to a user-level LaunchAgent.
+// It uses osascript to request the one-time admin password; subsequent installs
+// find no daemon and skip silently.
+func migrateFromSystemDaemon() {
+	if runtime.GOOS != "darwin" {
+		return
+	}
+	plist := "/Library/LaunchDaemons/dataseai-connector.plist"
+	if _, err := os.Stat(plist); os.IsNotExist(err) {
+		return
+	}
+	log.Printf("found legacy system daemon, removing: %s", plist)
+	script := fmt.Sprintf(
+		`do shell script "launchctl unload -w %q 2>/dev/null; rm -f %q" with administrator privileges`,
+		plist, plist,
+	)
+	if out, err := exec.Command("osascript", "-e", script).CombinedOutput(); err != nil {
+		log.Printf("warning: could not remove legacy daemon: %v\n%s", err, out)
+	} else {
+		log.Printf("removed legacy system daemon")
 	}
 }
 
