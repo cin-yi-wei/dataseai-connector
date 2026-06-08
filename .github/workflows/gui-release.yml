@@ -105,6 +105,11 @@ jobs:
           if [ -n "$APP" ]; then
             cp staging/dataseai-connector "$APP/Contents/MacOS/dataseai-connector"
             chmod +x "$APP/Contents/MacOS/dataseai-connector"
+            if [ "${{ matrix.goos }}" = "darwin" ]; then
+              codesign --force --sign - "$APP/Contents/MacOS/dataseai-connector"
+              codesign --force --deep --sign - "$APP"
+              codesign --verify --deep --strict --verbose=2 "$APP"
+            fi
             cp -r "$APP" "$NAME/"
           elif [ -f "cmd/connector-gui/build/bin/dataseai-connector-gui" ]; then
             cp cmd/connector-gui/build/bin/dataseai-connector-gui "$NAME/"
