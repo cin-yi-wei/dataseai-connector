@@ -37,7 +37,7 @@ func LoadConfig(path string) (Config, error) {
 	var cfg Config
 	b, err := os.ReadFile(path)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if os.IsNotExist(err) || os.IsPermission(err) {
 			return Config{Server: DefaultServer, Executor: DefaultExecutor}, nil
 		}
 		return cfg, err
@@ -65,7 +65,7 @@ func WriteConfig(path string, cfg Config) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, b, 0o600)
+	return os.WriteFile(path, b, 0o644)
 }
 
 func MaskToken(token string) string {

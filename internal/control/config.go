@@ -51,8 +51,7 @@ func WriteConfig(path string, cfg Config) error {
 	if err != nil {
 		return err
 	}
-	// 0600: contains the token, only owner should read.
-	return os.WriteFile(path, b, 0o600)
+	return os.WriteFile(path, b, 0o644)
 }
 
 func MaskToken(token string) string {

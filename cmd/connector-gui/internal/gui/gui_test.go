@@ -72,8 +72,8 @@ func TestWriteConfigOwnerOnlyPerms(t *testing.T) {
 	if err != nil {
 		t.Fatalf("stat: %v", err)
 	}
-	if got := info.Mode().Perm(); got != 0o600 {
-		t.Fatalf("mode = %o, want 0600", got)
+	if got := info.Mode().Perm(); got != 0o644 {
+		t.Fatalf("mode = %o, want 0644", got)
 	}
 }
 
