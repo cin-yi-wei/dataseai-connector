@@ -16,7 +16,8 @@ func DefaultLogPath() string {
 		}
 		return filepath.Join(base, "dataseai-connector", "connector.log")
 	case "darwin":
-		return "/Library/Logs/dataseai-connector/connector.log"
+		home, _ := os.UserHomeDir()
+		return filepath.Join(home, "Library", "Logs", "dataseai-connector", "connector.log")
 	default:
 		return "/var/log/dataseai-connector.log"
 	}

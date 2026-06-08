@@ -56,27 +56,10 @@ func connectorCommand(bin string, args []string) (string, []string) {
 }
 
 func elevatedConnectorCommand(bin string, args []string) (string, []string) {
-	switch runtime.GOOS {
-	case "linux":
+	if runtime.GOOS == "linux" {
 		return "pkexec", append([]string{bin}, args...)
-	case "darwin":
-		// osascript pops a native macOS password dialog.
-		shellCmd := shellescape(append([]string{bin}, args...))
-		return "osascript", []string{"-e", `do shell script ` + shellCmd + ` with administrator privileges`}
-	default:
-		return connectorCommand(bin, args)
 	}
-}
-
-// shellescape joins args into a single-quoted shell string safe for osascript.
-func shellescape(args []string) string {
-	quoted := make([]string, len(args))
-	for i, a := range args {
-		// Replace every ' with '\'' and wrap in single quotes.
-		safe := strings.ReplaceAll(a, "'", `'\''`)
-		quoted[i] = "'" + safe + "'"
-	}
-	return `"` + strings.Join(quoted, " ") + `"`
+	return connectorCommand(bin, args)
 }
 
 func runCommand(name string, args []string) (string, error) {
@@ -196,12 +179,10 @@ func configureArgsFromSourceConfig(sourceConfig, server, executor string) []stri
 }
 
 func serviceControlRunner() func(args ...string) (string, error) {
-	switch runtime.GOOS {
-	case "linux", "darwin":
+	if runtime.GOOS == "linux" {
 		return runElevatedConnector
-	default:
-		return runConnector
 	}
+	return runConnector
 }
 
 func Start() error {

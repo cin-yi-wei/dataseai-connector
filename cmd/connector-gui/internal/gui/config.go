@@ -27,7 +27,8 @@ func DefaultConfigPath() string {
 		}
 		return filepath.Join(base, "dataseai-connector", "config.yaml")
 	case "darwin":
-		return "/Library/Application Support/dataseai-connector/config.yaml"
+		home, _ := os.UserHomeDir()
+		return filepath.Join(home, "Library", "Application Support", "dataseai-connector", "config.yaml")
 	default:
 		return "/etc/dataseai-connector/config.yaml"
 	}

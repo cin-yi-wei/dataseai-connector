@@ -111,11 +111,16 @@ func mapServiceStatus(st service.Status, err error) control.ServiceStatus {
 }
 
 func newServiceConfig() *service.Config {
-	return &service.Config{
+	cfg := &service.Config{
 		Name:        "dataseai-connector",
 		DisplayName: "dataseai Connector",
 		Description: "LAN agent that bridges local MySQL to the dataseai cloud over WebSocket.",
 	}
+	if runtime.GOOS == "darwin" {
+		// LaunchAgent (user-level): no root needed for install/start/stop/status.
+		cfg.Option = service.KeyValue{"UserService": true}
+	}
+	return cfg
 }
 
 func setupServiceLogOutput(path string) error {
