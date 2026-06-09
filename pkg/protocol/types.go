@@ -79,6 +79,8 @@ type QueryRequest struct {
 	RequestID string      `json:"request_id"`
 	Target    MySQLTarget `json:"target"`
 	SQL       string      `json:"sql"`
+	// Dialect selects the database driver: "mysql" (default/empty) or "postgres".
+	Dialect string `json:"dialect,omitempty"`
 	// MaxRows caps how many rows the connector will stream back. 0 = no cap.
 	MaxRows int `json:"max_rows,omitempty"`
 	// BatchSize is the row batch size for streaming. 0 → connector picks.

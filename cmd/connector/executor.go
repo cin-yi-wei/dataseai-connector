@@ -21,6 +21,23 @@ type Executor interface {
 	Run(ctx context.Context, req protocol.QueryRequest, sink Sink) error
 }
 
+// dialectRouter routes each request to the appropriate executor based on
+// the Dialect field in the QueryRequest. Empty / "mysql" → MySQL, "postgres"
+// / "postgresql" → PostgreSQL.
+type dialectRouter struct {
+	mysql    Executor
+	postgres Executor
+}
+
+func (r dialectRouter) Run(ctx context.Context, req protocol.QueryRequest, sink Sink) error {
+	switch req.Dialect {
+	case "postgres", "postgresql":
+		return r.postgres.Run(ctx, req, sink)
+	default:
+		return r.mysql.Run(ctx, req, sink)
+	}
+}
+
 // MockExecutor pretends to be MySQL. Returns 50 fake rows in 5 batches of
 // 10, sleeping 100ms between batches to simulate work. Used until the real
 // MySQL executor lands.

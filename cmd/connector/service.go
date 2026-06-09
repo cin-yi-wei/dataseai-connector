@@ -77,10 +77,17 @@ func buildExecutor(name string) (Executor, error) {
 	switch name {
 	case "", "mysql":
 		return MySQLExecutor{}, nil
+	case "postgres", "postgresql":
+		return PostgreSQLExecutor{}, nil
+	case "auto":
+		return dialectRouter{
+			mysql:    MySQLExecutor{},
+			postgres: PostgreSQLExecutor{},
+		}, nil
 	case "mock":
 		return MockExecutor{}, nil
 	default:
-		return nil, fmt.Errorf("unknown executor %q; valid: mysql | mock", name)
+		return nil, fmt.Errorf("unknown executor %q; valid: mysql | postgres | auto | mock", name)
 	}
 }
 
