@@ -106,20 +106,20 @@ func (e PostgreSQLExecutor) openDB(t protocol.MySQLTarget, dialTimeout time.Dura
 		port = 5432
 	}
 
-	dsn := fmt.Sprintf("host=%s port=%d user=%s dbname=%s sslmode=disable connect_timeout=%d",
-		host, port, t.User, t.Database, int(dialTimeout.Seconds()))
-	if t.Password != "" {
-		dsn += fmt.Sprintf(" password=%s", t.Password)
-	}
-
-	cfg, err := pgx.ParseConfig(dsn)
+	cfg, err := pgx.ParseConfig(fmt.Sprintf(
+		"host=%s port=%d sslmode=disable", host, port,
+	))
 	if err != nil {
 		return nil, nil, fmt.Errorf("pg config: %w", err)
+	}
+	cfg.User = t.User
+	cfg.Password = t.Password
+	if t.Database != "" {
+		cfg.Database = t.Database
 	}
 
 	var sshClient *ssh.Client
 	cleanup := func() {}
-
 	if !t.SSH.IsZero() {
 		sshClient, err = openSSHClient(*t.SSH, dialTimeout)
 		if err != nil {
