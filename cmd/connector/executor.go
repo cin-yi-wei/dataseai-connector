@@ -22,17 +22,22 @@ type Executor interface {
 }
 
 // dialectRouter routes each request to the appropriate executor based on
-// the Dialect field in the QueryRequest. Empty / "mysql" → MySQL, "postgres"
-// / "postgresql" → PostgreSQL.
+// the Dialect field in the QueryRequest.
 type dialectRouter struct {
-	mysql    Executor
-	postgres Executor
+	mysql     Executor
+	postgres  Executor
+	bytehouse Executor
+	sqlite    Executor
 }
 
 func (r dialectRouter) Run(ctx context.Context, req protocol.QueryRequest, sink Sink) error {
 	switch req.Dialect {
-	case "postgres", "postgresql":
+	case "postgres", "postgresql", "cockroachdb", "redshift":
 		return r.postgres.Run(ctx, req, sink)
+	case "bytehouse":
+		return r.bytehouse.Run(ctx, req, sink)
+	case "sqlite":
+		return r.sqlite.Run(ctx, req, sink)
 	default:
 		return r.mysql.Run(ctx, req, sink)
 	}
