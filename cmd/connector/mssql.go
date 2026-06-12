@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"runtime/debug"
 	"time"
 
 	"github.com/cin-yi-wei/dataseai-connector/pkg/protocol"
@@ -21,7 +22,17 @@ type SQLServerExecutor struct {
 	DialTimeout time.Duration
 }
 
-func (e SQLServerExecutor) Run(ctx context.Context, req protocol.QueryRequest, sink Sink) error {
+func (e SQLServerExecutor) Run(ctx context.Context, req protocol.QueryRequest, sink Sink) (err error) {
+	// go-mssqldb can panic on some drivers/server combinations; recover so a
+	// single bad query can't crash the whole connector process (which would
+	// otherwise just drop the session with no diagnostic).
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("mssql: PANIC handling query: %v\n%s", r, debug.Stack())
+			err = fmt.Errorf("mssql panic: %v", r)
+		}
+	}()
+
 	dialTimeout := e.DialTimeout
 	if dialTimeout <= 0 {
 		dialTimeout = 10 * time.Second
