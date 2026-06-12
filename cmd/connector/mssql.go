@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 	"net"
 	"time"
 
@@ -33,6 +34,21 @@ func (e SQLServerExecutor) Run(ctx context.Context, req protocol.QueryRequest, s
 	defer cleanup()
 	defer db.Close()
 	db.SetMaxOpenConns(1)
+
+	// Establish the connection up front with a bounded timeout so a stalled
+	// TLS handshake or login surfaces as a logged error instead of hanging
+	// until the caller's deadline (which leaves no diagnostic behind).
+	pingCtx, cancelPing := context.WithTimeout(ctx, 12*time.Second)
+	connectStart := time.Now()
+	if perr := db.PingContext(pingCtx); perr != nil {
+		cancelPing()
+		log.Printf("mssql: connect to %s:%d failed after %s: %v",
+			req.Target.Host, req.Target.Port, time.Since(connectStart).Round(time.Millisecond), perr)
+		return fmt.Errorf("connect: %w", perr)
+	}
+	cancelPing()
+	log.Printf("mssql: connected to %s:%d in %s",
+		req.Target.Host, req.Target.Port, time.Since(connectStart).Round(time.Millisecond))
 
 	rows, err := db.QueryContext(ctx, req.SQL)
 	if err != nil {
