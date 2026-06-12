@@ -113,12 +113,13 @@ func (e SQLServerExecutor) openDB(t protocol.MySQLTarget, dialTimeout time.Durat
 		User:     t.User,
 		Password: t.Password,
 		Database: t.Database,
-		// Opportunistic encryption (encrypt=false): the login packet is still
-		// encrypted, which keeps servers configured with Force Encryption happy,
-		// while not requiring TLS for the data stream. EncryptionDisabled refuses
-		// TLS entirely and hangs against Force-Encryption servers. Trust the
-		// (often self-signed) server certificate so the login TLS handshake works.
-		Encryption:             msdsn.EncryptionOff,
+		// Always encrypt the connection (encrypt=true). SQL Server instances with
+		// Force Encryption enabled drop unencrypted or login-only-encrypted
+		// connections, which manifests as a hang until the caller's deadline.
+		// Full encryption matches what `sqlcmd -C` does and works whether or not
+		// the server forces it. TrustServerCertificate accepts the (typically
+		// self-signed) certificate so the TLS handshake completes without a CA.
+		Encryption:             msdsn.EncryptionRequired,
 		TrustServerCertificate: true,
 		DialTimeout:            dialTimeout,
 	}
