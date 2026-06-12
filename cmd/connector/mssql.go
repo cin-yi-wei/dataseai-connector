@@ -108,12 +108,17 @@ func (e SQLServerExecutor) openDB(t protocol.MySQLTarget, dialTimeout time.Durat
 	}
 
 	cfg := msdsn.Config{
-		Host:                   host,
-		Port:                   uint64(port),
-		User:                   t.User,
-		Password:               t.Password,
-		Database:               t.Database,
-		Encryption:             msdsn.EncryptionDisabled,
+		Host:     host,
+		Port:     uint64(port),
+		User:     t.User,
+		Password: t.Password,
+		Database: t.Database,
+		// Opportunistic encryption (encrypt=false): the login packet is still
+		// encrypted, which keeps servers configured with Force Encryption happy,
+		// while not requiring TLS for the data stream. EncryptionDisabled refuses
+		// TLS entirely and hangs against Force-Encryption servers. Trust the
+		// (often self-signed) server certificate so the login TLS handshake works.
+		Encryption:             msdsn.EncryptionOff,
 		TrustServerCertificate: true,
 		DialTimeout:            dialTimeout,
 	}
