@@ -140,6 +140,11 @@ func (e SQLServerExecutor) openDB(t protocol.MySQLTarget, dialTimeout time.Durat
 		User:     t.User,
 		Password: t.Password,
 		Database: t.Database,
+		// Must be set explicitly: NewConnectorConfig does not default this the
+		// way DSN parsing does, and dialConnection ranges over Protocols — an
+		// empty slice dials nothing, returns a nil conn with no error, and the
+		// driver then panics on the nil connection.
+		Protocols: []string{"tcp"},
 		// Always encrypt the connection (encrypt=true). SQL Server instances with
 		// Force Encryption enabled drop unencrypted or login-only-encrypted
 		// connections, which manifests as a hang until the caller's deadline.
