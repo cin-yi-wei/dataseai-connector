@@ -149,12 +149,21 @@ func (e SQLServerExecutor) openDB(t protocol.MySQLTarget, dialTimeout time.Durat
 		// Force Encryption enabled drop unencrypted or login-only-encrypted
 		// connections, which manifests as a hang until the caller's deadline.
 		// Full encryption matches what `sqlcmd -C` does and works whether or not
-		// the server forces it. TrustServerCertificate accepts the (typically
-		// self-signed) certificate so the TLS handshake completes without a CA.
+		// the server forces it.
 		Encryption:             msdsn.EncryptionRequired,
 		TrustServerCertificate: true,
 		DialTimeout:            dialTimeout,
 	}
+	// The TrustServerCertificate bool above is only honoured on the DSN-string
+	// path; when building Config directly the driver verifies the certificate
+	// unless TLSConfig is set. Build a TLSConfig that skips verification so the
+	// (typically self-signed) SQL Server certificate is accepted — equivalent
+	// to `sqlcmd -C`.
+	tlsConf, err := msdsn.SetupTLS("", "", true, host, "")
+	if err != nil {
+		return nil, nil, fmt.Errorf("tls config: %w", err)
+	}
+	cfg.TLSConfig = tlsConf
 	connector := mssql.NewConnectorConfig(cfg)
 
 	cleanup := func() {}
