@@ -28,6 +28,7 @@ type dialectRouter struct {
 	postgres  Executor
 	bytehouse Executor
 	sqlite    Executor
+	mssql     Executor
 }
 
 func (r dialectRouter) Run(ctx context.Context, req protocol.QueryRequest, sink Sink) error {
@@ -38,6 +39,8 @@ func (r dialectRouter) Run(ctx context.Context, req protocol.QueryRequest, sink 
 		return r.bytehouse.Run(ctx, req, sink)
 	case "sqlite":
 		return r.sqlite.Run(ctx, req, sink)
+	case "mssql", "sqlserver":
+		return r.mssql.Run(ctx, req, sink)
 	default:
 		return r.mysql.Run(ctx, req, sink)
 	}
